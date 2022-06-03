@@ -1,0 +1,5 @@
+from envs.minitaur_env.minitaur.minitaur_alternating_legs_env import MinitaurAlternatingLegsEnv
+from envs.minitaur_env.minitaur.minitaur_reactive_env import MinitaurReactiveEnv
+from envs.minitaur_env.minitaur.minitaur_trotting_env import MinitaurTrottingEnv
+
+
