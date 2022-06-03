@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
-from agents.utils import RolloutBuffer
-from model import ActorCritic
+# from utils import MCPPOBuffer
+# from utils import RolloutBuffer
+from agents.mcn_ppo.utils import RolloutBuffer
+from agents.mcn_ppo.model import ActorCritic
 
 
-class PPO:
-    def __init__(self, state_dim, action_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init=0.6, use_gpu=True):
+class MCNPPO:
+    def __init__(self, state_dim, action_dim, r_dim, lr_actor, lr_critic, gamma, K_epochs, eps_clip, has_continuous_action_space, action_std_init=0.6, use_gpu=True):
         """
 
         :param state_dim: env的状态空间维度
@@ -20,6 +22,7 @@ class PPO:
         """
 
         self.device = torch.device('cpu')
+        self.r_dim = r_dim
 
         if use_gpu and torch.cuda.is_available():
             self.device = torch.device('cuda:0')
@@ -37,15 +40,19 @@ class PPO:
         self.eps_clip = eps_clip
         self.K_epochs = K_epochs
 
+        # self.buffer = MCPPOBuffer()
         self.buffer = RolloutBuffer()
 
-        self.policy = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init, device=self.device).to(self.device)
+        self.policy = ActorCritic(state_dim, action_dim, r_dim, has_continuous_action_space,
+                                  action_std_init, device=self.device).to(self.device)
         self.optimizer = torch.optim.Adam([
             {'params': self.policy.actor.parameters(), 'lr': lr_actor},
-            {'params': self.policy.critic.parameters(), 'lr': lr_critic}
+            {'params': self.policy.critics.parameters(), 'lr': lr_critic}
+            # {'params': self.policy.critic.parameters(), 'lr': lr_critic}
         ])
 
-        self.policy_old = ActorCritic(state_dim, action_dim, has_continuous_action_space, action_std_init, device=self.device).to(self.device)
+        self.policy_old = ActorCritic(state_dim, action_dim, r_dim, has_continuous_action_space,
+                                      action_std_init, device=self.device).to(self.device)
         self.policy_old.load_state_dict(self.policy.state_dict())
 
         self.MseLoss = nn.MSELoss()

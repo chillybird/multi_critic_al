@@ -20,6 +20,15 @@ class MCPPOBuffer:
     """
 
     def __init__(self, obs_dim, act_dim, size, r_dim, gamma=0.99, lam=0.95):
+        """
+        buffer initialize
+        :param obs_dim:
+        :param act_dim:
+        :param size: buffer transition size
+        :param r_dim: reward signal size
+        :param gamma:
+        :param lam:
+        """
         self.r_dim = r_dim
         self.obs_buf = np.zeros(core.combined_shape(size, obs_dim), dtype=np.float32)
         self.act_buf = np.zeros(core.combined_shape(size, act_dim), dtype=np.float32)
@@ -34,6 +43,12 @@ class MCPPOBuffer:
     def store(self, obs, act, rew, val, logp):
         """
         Append one timestep of agent-environment interaction to the buffer.
+        :param obs:
+        :param act:
+        :param rew: state-action reward
+        :param val: critic value function estimation
+        :param logp: action log probability
+        :return:
         """
         assert self.ptr < self.max_size  # buffer has to have room so you can store
         self.obs_buf[self.ptr] = obs
@@ -256,6 +271,7 @@ def mc_ppo(env_fn, ac_kwargs=dict(), seed=0,
     # Set up function for computing value loss
     def compute_loss_v(data):
         obs, ret = data['obs'], data['ret']
+        # obs buffer structure [buffer_size, obs_dim]
         return F.mse_loss(obs[:, :n_rewards] * ac.v(obs), obs[:, :n_rewards] * ret)
 
     # Set up optimizers for policy and value function

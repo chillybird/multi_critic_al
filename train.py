@@ -6,21 +6,25 @@ from datetime import datetime
 import numpy as np
 import torch
 
-from agents.ppo.common import PPO
+# from agents.ppo.common import PPO
+from agents.mcn_ppo.common import MCNPPO
 from init import train_params, output_params_info, train_init
 from envs.minitaur_env import BulletEnv
+from envs.mt_env import MultiTaskWrapper
 
 
 def train():
-    env_name = 'minitaur_trotting_env'
+    task_name = "multi_task"
+    env_names = ["minitaur_reactive_env", "minitaur_trotting_env"]
     env_build_args = {
         'render': False,
-        'use_signal_in_observation': True,
+        'use_signal_in_observation': False,
         'use_angle_in_observation': True,
     }
-    env = BulletEnv(env_name).build_env(**env_build_args)
+    env = MultiTaskWrapper([BulletEnv(env_name).build_env(**env_build_args) for env_name in env_names])
+    r_dim = len(env_names)
 
-    writer, checkpoint_path = train_init(env_name)
+    writer, checkpoint_path = train_init(task_name)
 
     # state space dimension
     state_dim = env.observation_space.shape[0]
@@ -30,7 +34,7 @@ def train():
     else:
         action_dim = env.action_space.n
 
-    output_params_info(env_name, state_dim, action_dim)
+    output_params_info(task_name, state_dim, action_dim)
 
     if train_params.random_seed:
         print("--------------------------------------------------------------------------------------------")
@@ -41,7 +45,11 @@ def train():
 
     print("============================================================================================")
     # initialize a PPO agent
-    ppo_agent = PPO(state_dim, action_dim, train_params.lr_actor, train_params.lr_critic,
+    # ppo_agent = PPO(state_dim, action_dim, train_params.lr_actor, train_params.lr_critic,
+    #                 train_params.gamma, train_params.K_epochs, train_params.eps_clip,
+    #                 train_params.has_continuous_action_space, train_params.action_std, use_gpu=True)
+
+    ppo_agent = MCNPPO(state_dim, action_dim, r_dim, train_params.lr_actor, train_params.lr_critic,
                     train_params.gamma, train_params.K_epochs, train_params.eps_clip,
                     train_params.has_continuous_action_space, train_params.action_std, use_gpu=True)
 
@@ -64,6 +72,8 @@ def train():
     time_step = 0
     i_episode = 0
 
+    # record task reward
+    reward_breakdown = np.zeros(len(env_names))
     # training loop
     while train_params.loop_flag or time_step <= train_params.max_training_timesteps:
 
@@ -74,8 +84,10 @@ def train():
 
             # select action with policy
             action = ppo_agent.select_action(state)
-            state, reward, done, _ = env.step(action)
+            state, reward, done, info = env.step(action)
 
+            r = info['RewardBreakdown'].copy()
+            reward_breakdown += r
             # saving reward and is_terminals
             ppo_agent.buffer.rewards.append(reward)
             ppo_agent.buffer.is_terminals.append(done)
@@ -127,6 +139,11 @@ def train():
 
             # break; if the episode is over
             if done:
+                # print task reward
+                for i in range(len(env_names)):
+                    if reward_breakdown[i]:
+                        print(f"task {i} done reward: ", reward_breakdown[i])
+                reward_breakdown = np.zeros(len(env_names))
                 break
 
         print_running_reward += current_ep_reward

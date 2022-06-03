@@ -484,13 +484,14 @@ class ExternalProcess(object):
 class ConvertTo32Bit(object):
     """Convert data types of an OpenAI Gym environment to 32 bit."""
 
-    def __init__(self, env):
+    def __init__(self, env, ma=False):
         """Convert data types of an OpenAI Gym environment to 32 bit.
 
         Args:
           env: OpenAI Gym environment.
         """
         self._env = env
+        self.ma = ma
 
     def __getattr__(self, name):
         """Forward unimplemented attributes to the original environment.
@@ -515,11 +516,17 @@ class ConvertTo32Bit(object):
         Returns:
           Converted observation, converted reward, done flag, and info object.
         """
-        obs, share_obs, reward, done, info, avail_action = self._env.step(action)
-        obs = self._convert_observ(obs)
-        share_obs = self._convert_observ(share_obs)
-        reward = self._convert_reward(reward)
-        return obs, share_obs, reward, done, info, avail_action
+        if self.ma:
+            obs, share_obs, reward, done, info, avail_action = self._env.step(action)
+            obs = self._convert_observ(obs)
+            share_obs = self._convert_observ(share_obs)
+            reward = self._convert_reward(reward)
+            return obs, share_obs, reward, done, info, avail_action
+        else:
+            obs, reward, done, info = self._env.step(action)
+            obs = self._convert_observ(obs)
+            reward = self._convert_reward(reward)
+            return obs, reward, done, info
 
     def reset(self):
         """Reset the environment and convert the resulting observation.
@@ -527,10 +534,15 @@ class ConvertTo32Bit(object):
         Returns:
           Converted observation.
         """
-        obs, share_obs, avail_actions = self._env.reset()
-        obs = self._convert_observ(obs)
-        share_obs = self._convert_observ(share_obs)
-        return obs, share_obs, avail_actions
+        if self.ma:
+            obs, share_obs, avail_actions = self._env.reset()
+            obs = self._convert_observ(obs)
+            share_obs = self._convert_observ(share_obs)
+            return obs, share_obs, avail_actions
+        else:
+            obs = self._env.reset()
+            obs = self._convert_observ(obs)
+            return obs
 
     def _convert_observ(self, observ):
         """Convert the observation to 32 bits.

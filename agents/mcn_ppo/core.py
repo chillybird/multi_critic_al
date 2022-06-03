@@ -7,10 +7,6 @@ import torch.nn as nn
 from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
 
-from copy import deepcopy
-
-import gym
-
 
 def combined_shape(length, shape=None):
     if shape is None:
@@ -20,9 +16,9 @@ def combined_shape(length, shape=None):
 
 def mlp(sizes, activation, output_activation=nn.Identity):
     layers = []
-    for j in range(len(sizes)-1):
-        act = activation if j < len(sizes)-2 else output_activation
-        layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
+    for j in range(len(sizes) - 1):
+        act = activation if j < len(sizes) - 2 else output_activation
+        layers += [nn.Linear(sizes[j], sizes[j + 1]), act()]
     return nn.Sequential(*layers)
 
 
@@ -34,14 +30,14 @@ def discount_cumsum(x, discount):
     """
     magic from rllab for computing discounted cumulative sums of vectors.
 
-    input: 
-        vector x, 
-        [x0, 
-         x1, 
+    input:
+        vector x,
+        [x0,
+         x1,
          x2]
 
     output:
-        [x0 + discount * x1 + discount^2 * x2,  
+        [x0 + discount * x1 + discount^2 * x2,
          x1 + discount * x2,
          x2]
     """
@@ -57,7 +53,7 @@ class Actor(nn.Module):
         raise NotImplementedError
 
     def forward(self, obs, act=None):
-        # Produce action distributions for given observations, and 
+        # Produce action distributions for given observations, and
         # optionally compute the log likelihood of given actions under
         # those distributions.
         pi = self._distribution(obs)
@@ -68,7 +64,7 @@ class Actor(nn.Module):
 
 
 class MLPCategoricalActor(Actor):
-    
+
     def __init__(self, obs_dim, act_dim, hidden_sizes, activation):
         super().__init__()
         self.logits_net = mlp([obs_dim] + list(hidden_sizes) + [act_dim], activation)
@@ -95,7 +91,7 @@ class MLPGaussianActor(Actor):
         return Normal(mu, std)
 
     def _log_prob_from_distribution(self, pi, act):
-        return pi.log_prob(act).sum(axis=-1)    # Last axis sum needed for Torch Normal distribution
+        return pi.log_prob(act).sum(axis=-1)  # Last axis sum needed for Torch Normal distribution
 
 
 class MLPCritic(nn.Module):
@@ -117,15 +113,12 @@ class MultiMLPCritic(nn.Module):
             self.v.append(MLPCritic(obs_dim, hidden_sizes, activation))
 
     def forward(self, obs):
-        vs = [v(obs) for v in self.v] # Squeeze critical to ensure v has right shape.
-        return torch.cat(vs, -1) 
+        vs = [v(obs) for v in self.v]  # Squeeze critical to ensure v has right shape.
+        return torch.cat(vs, -1)
 
 
 class MLPActorCritic(nn.Module):
-
-
-    def __init__(self, observation_space, action_space, r_dim, 
-                 hidden_sizes=(64,64), activation=nn.Tanh):
+    def __init__(self, observation_space, action_space, r_dim, hidden_sizes=(64, 64), activation=nn.Tanh):
         super().__init__()
 
         assert len(observation_space.shape) == 1, (
@@ -147,7 +140,6 @@ class MLPActorCritic(nn.Module):
         # build value function
         self.v = MultiMLPCritic(obs_dim, r_dim, hidden_sizes, activation)
 
-
     def step(self, obs, deterministic=False):
         with torch.no_grad():
             pi = self.pi._distribution(obs)
@@ -161,4 +153,3 @@ class MLPActorCritic(nn.Module):
 
     def act(self, obs, deterministic=False):
         return self.step(obs)[0]
-
